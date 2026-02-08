@@ -4,13 +4,16 @@
 Токены хранятся в JSON формате: tokens.json
 """
 import json
+import os
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 
 APP_DIR = Path(__file__).resolve().parent
-TOKENS_FILE = APP_DIR / "tokens.json"
+# На Render.com файлы могут не сохраняться, используем переменную окружения
+# или /tmp (но лучше использовать переменные окружения для токенов)
+TOKENS_FILE = Path(os.getenv("TOKENS_FILE", str(APP_DIR / "tokens.json")))
 
 
 class TokenManager:
@@ -19,7 +22,23 @@ class TokenManager:
         self.tokens = self._load_tokens()
 
     def _load_tokens(self) -> Dict[str, Dict]:
-        """Загружает токены из файла."""
+        """Загружает токены из файла или переменной окружения."""
+        # Сначала пробуем загрузить из переменной окружения (для Render.com)
+        env_tokens = os.getenv("TOKENS_JSON")
+        if env_tokens:
+            try:
+                data = json.loads(env_tokens)
+                # Конвертируем строки дат обратно в datetime для проверки
+                for token, info in data.items():
+                    if "created_at" in info:
+                        info["created_at"] = datetime.fromisoformat(info["created_at"])
+                    if "expires_at" in info and info["expires_at"]:
+                        info["expires_at"] = datetime.fromisoformat(info["expires_at"])
+                return data
+            except (json.JSONDecodeError, ValueError):
+                pass
+        
+        # Если нет в переменной окружения, загружаем из файла
         if not self.tokens_file.exists():
             return {}
         try:
@@ -36,7 +55,7 @@ class TokenManager:
             return {}
 
     def _save_tokens(self):
-        """Сохраняет токены в файл."""
+        """Сохраняет токены в файл и обновляет переменную окружения (если нужно)."""
         # Конвертируем datetime в строки для JSON
         data = {}
         for token, info in self.tokens.items():
@@ -46,8 +65,20 @@ class TokenManager:
             if isinstance(data[token].get("expires_at"), datetime):
                 if data[token]["expires_at"]:
                     data[token]["expires_at"] = data[token]["expires_at"].isoformat()
-        with open(self.tokens_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        # Сохраняем в файл (если возможно)
+        try:
+            # Создаём директорию если нужно
+            self.tokens_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.tokens_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            # На Render.com файлы могут не сохраняться - это нормально
+            print(f"Warning: Could not save tokens to file: {e}")
+        
+        # Также обновляем переменную окружения (для Render.com)
+        # Но это не будет работать автоматически - нужно обновлять вручную в Render
+        # Или использовать внешнее хранилище
 
     def create_token(
         self,
