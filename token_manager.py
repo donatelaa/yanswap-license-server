@@ -25,33 +25,51 @@ class TokenManager:
         """Загружает токены из файла или переменной окружения."""
         # Сначала пробуем загрузить из переменной окружения (для Render.com)
         env_tokens = os.getenv("TOKENS_JSON")
+        print(f"DEBUG: TOKENS_JSON env var exists: {bool(env_tokens)}")
         if env_tokens:
             try:
                 data = json.loads(env_tokens)
+                print(f"DEBUG: Loaded {len(data)} tokens from TOKENS_JSON")
                 # Конвертируем строки дат обратно в datetime для проверки
                 for token, info in data.items():
-                    if "created_at" in info:
-                        info["created_at"] = datetime.fromisoformat(info["created_at"])
-                    if "expires_at" in info and info["expires_at"]:
-                        info["expires_at"] = datetime.fromisoformat(info["expires_at"])
+                    if "created_at" in info and isinstance(info["created_at"], str):
+                        try:
+                            info["created_at"] = datetime.fromisoformat(info["created_at"])
+                        except:
+                            pass
+                    if "expires_at" in info and info["expires_at"] and isinstance(info["expires_at"], str):
+                        try:
+                            info["expires_at"] = datetime.fromisoformat(info["expires_at"])
+                        except:
+                            pass
                 return data
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"DEBUG: Error parsing TOKENS_JSON: {e}")
                 pass
         
         # Если нет в переменной окружения, загружаем из файла
         if not self.tokens_file.exists():
+            print(f"DEBUG: tokens.json file does not exist: {self.tokens_file}")
             return {}
         try:
             with open(self.tokens_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                print(f"DEBUG: Loaded {len(data)} tokens from file")
                 # Конвертируем строки дат обратно в datetime для проверки
                 for token, info in data.items():
-                    if "created_at" in info:
-                        info["created_at"] = datetime.fromisoformat(info["created_at"])
-                    if "expires_at" in info and info["expires_at"]:
-                        info["expires_at"] = datetime.fromisoformat(info["expires_at"])
+                    if "created_at" in info and isinstance(info["created_at"], str):
+                        try:
+                            info["created_at"] = datetime.fromisoformat(info["created_at"])
+                        except:
+                            pass
+                    if "expires_at" in info and info["expires_at"] and isinstance(info["expires_at"], str):
+                        try:
+                            info["expires_at"] = datetime.fromisoformat(info["expires_at"])
+                        except:
+                            pass
                 return data
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"DEBUG: Error loading tokens from file: {e}")
             return {}
 
     def _save_tokens(self):

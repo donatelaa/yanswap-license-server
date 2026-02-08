@@ -24,19 +24,50 @@ token_manager = TokenManager()
 
 def get_token_from_request():
     """Токен может быть в JSON body или в form."""
+    # Логируем запрос для отладки
+    print(f"DEBUG: Request method: {request.method}")
+    print(f"DEBUG: Request content-type: {request.content_type}")
+    print(f"DEBUG: Request data: {request.get_data(as_text=True)[:200]}")
+    
     if request.is_json:
         data = request.get_json(silent=True) or {}
-        return data.get("token") or data.get("Token")
-    return request.form.get("token") or request.form.get("Token")
+        print(f"DEBUG: JSON data: {data}")
+        token = data.get("token") or data.get("Token")
+        print(f"DEBUG: Extracted token: {token}")
+        return token
+    
+    # Также пробуем form data
+    form_token = request.form.get("token") or request.form.get("Token")
+    if form_token:
+        print(f"DEBUG: Form token: {form_token}")
+        return form_token
+    
+    # Пробуем получить из query string
+    query_token = request.args.get("token") or request.args.get("Token")
+    if query_token:
+        print(f"DEBUG: Query token: {query_token}")
+        return query_token
+    
+    return None
 
 
 def check_token():
     """Проверяет токен через TokenManager."""
     token = get_token_from_request()
+    print(f"DEBUG: check_token called, token: {token}")
+    
     if not token:
+        print("DEBUG: No token found in request")
         return None, jsonify({"detail": "Missing token", "ok": False}), 400
     
+    # Показываем доступные токены для отладки
+    all_tokens = list(token_manager.tokens.keys())
+    print(f"DEBUG: Available tokens: {all_tokens[:5]}... (total: {len(all_tokens)})")
+    print(f"DEBUG: Checking token: {token[:20]}...")
+    
     is_valid, error = token_manager.is_valid(token)
+    print(f"DEBUG: Token validation result: valid={is_valid}, error={error}")
+    
     if not is_valid:
         return None, jsonify({"detail": error or "Invalid token", "ok": False}), 403
     
@@ -48,9 +79,13 @@ def check_token():
 @app.route("/activate", methods=["POST", "GET"])
 @app.route("/api/activate", methods=["POST", "GET"])
 def activate():
+    print(f"DEBUG: /activate called, method: {request.method}")
     token, err = check_token()
     if err:
+        print(f"DEBUG: Token check failed: {err.get_json() if hasattr(err, 'get_json') else err}")
         return err
+    
+    print(f"DEBUG: Token validated successfully: {token}")
     # Успешная активация
     return jsonify({"ok": True, "success": True, "token": token})
 
