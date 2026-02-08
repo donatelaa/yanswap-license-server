@@ -113,12 +113,30 @@ def hook_config():
 def root():
     tokens = token_manager.list_tokens()
     active_tokens = [t for t in tokens if t.get("active", True)]
+    # Показываем первые несколько токенов для отладки (первые 10 символов)
+    token_previews = [t["token"][:10] + "..." for t in tokens[:5]]
     return jsonify({
         "service": "license",
         "endpoints": ["/activate", "/heartbeat", "/hook_config", "/sync_tokens"],
         "tokens_file": str(token_manager.tokens_file),
         "total_tokens": len(tokens),
         "active_tokens": len(active_tokens),
+        "token_previews": token_previews,  # Для отладки
+        "has_env_tokens": bool(os.getenv("TOKENS_JSON")),
+    })
+
+
+@app.route("/test", methods=["GET", "POST"])
+def test():
+    """Тестовый эндпоинт для проверки работы сервера"""
+    token = get_token_from_request()
+    tokens = token_manager.list_tokens()
+    return jsonify({
+        "status": "ok",
+        "received_token": token[:20] + "..." if token else None,
+        "total_tokens": len(tokens),
+        "token_list": [t["token"][:20] + "..." for t in tokens[:10]],
+        "has_env": bool(os.getenv("TOKENS_JSON")),
     })
 
 
